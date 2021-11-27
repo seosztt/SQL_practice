@@ -46,6 +46,7 @@ from classicmodels.orders
 group by 1
 order by 1;
 
+
 select substr(a.orderdate, 1, 4) YY,
 count(distinct a.customernumber) n_purchaser,
 sum(priceeach*quantityordered) as sales
@@ -123,3 +124,84 @@ left join classicmodels.customers c
 on a.customerNumber = c.customerNumber
 group by 1
 order by 2 desc;
+
+create table classicmodels.stat as
+select c.country,
+sum(priceEach*quantityordered) sales
+from classicmodels.orders a
+left join classicmodels.orderdetails b
+on a.ordernumber = b.ordernumber
+left join classicmodels.customers c
+on a.customerNumber = c.customerNumber
+group by 1
+order by 2 desc;
+
+select *
+from classicmodels.stat;
+
+select country, sales,
+dense_rank() over(order by sales desc) rnk
+from classicmodels.stat;
+
+create table classicmodels.stat_rnk as
+select country, sales,
+dense_rank() over(order by sales desc) rnk
+from classicmodels.stat;
+
+select *
+from classicmodels.stat_rnk;
+
+select *
+from classicmodels.stat_rnk
+where rnk between 1 and 5;
+
+select * from
+	(select country, sales,
+	dense_rank() over(order by sales desc) rnk from
+		(select c.country, sum(priceEach*quantityordered) sales from
+		classicmodels.orders a
+        left join classicmodels.orderdetails b
+        on a.ordernumber = b.ordernumber
+        left join classicmodels.customers c
+        on a.customerNumber = c.customerNumber
+        group by 1) a) a
+        where rnk <= 5;
+        
+select a.customernumber, a.orderdate, b.customernumber, b.orderdate
+from classicmodels.orders a
+left join classicmodels.orders b
+on a.customerNumber = b.customerNumber
+and substr(a.orderdate, 1, 4) = substr(b.orderdate, 1, 4) -1;
+
+select c.country, substr(a.orderdate, 1, 4) YY,
+count(distinct a.customernumber) bu_1,
+count(distinct b.customernumber) bu_2,
+count(distinct b.customernumber)/ count(distinct a.customernumber)
+retention_rate
+from classicmodels.orders a
+left join classicmodels.orders b
+on a.customerNumber = b.customerNumber
+and substr(a.orderdate,1,4) = substr(b.orderdate, 1, 4) -1
+left join classicmodels.customers c
+on a.customerNumber=c.customerNumber
+group by 1,2;
+
+create table classicmodels.product_sales as
+select d.productname,
+sum(quantityordered*priceEach) sales
+from classicmodels.orders a
+left join classicmodels.customers b
+on a.customerNumber = b.customerNumber
+left join classicmodels.orderdetails c
+on a.ordernumber = c.orderNumber
+left join classicmodels.products d
+on c.productCode = d.productCode
+where b.country = 'usa'
+group by 1;
+        
+select * from
+	(select *, row_number() over(order by sales desc) rnk
+	from classicmodels.product_sales) a
+	where rnk <= 5
+	order by rnk;
+
