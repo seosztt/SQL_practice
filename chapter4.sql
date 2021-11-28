@@ -205,3 +205,59 @@ select * from
 	where rnk <= 5
 	order by rnk;
 
+select max(orderdate) mx_order
+from classicmodels.orders;
+
+select customernumber, max(orderdate) mx_order
+from classicmodels.orders
+group by 1;
+
+select customernumber, mx_order, '2005-06-01', datediff('2005-06-01', mx_order) diff
+from (select customernumber, max(orderdate) mx_order 
+		from classicmodels.orders
+        group by 1)
+        base;
+        
+select *, case when diff>=90 then 'churn' else 'non-churn' end churn_type
+from (select customernumber, mx_order, '2005-06-01', datediff('2005-06-01', mx_order) diff
+	  from (select customernumber, max(orderdate) mx_order 
+			from classicmodels.orders
+			group by 1)
+			base)
+            base;
+            
+select case when diff>=90 then 'churn' else 'non-churn' end churn_type, count(distinct customernumber) n_cus
+from (select customernumber, mx_order, '2005-06-01', datediff('2005-06-01', mx_order) diff
+	  from (select customernumber, max(orderdate) mx_order 
+			from classicmodels.orders
+			group by 1)
+			base)
+            base group by 1;
+            
+create table classicmodels.churn_list as
+select case when diff >= 90 then 'churn' else 'non-churn' end churn_type, customernumber
+from (select customernumber, mx_order, '2005-06-01', datediff('2005-06-01', mx_order) diff
+	  from (select customernumber, max(orderdate) mx_order 
+			from classicmodels.orders
+			group by 1)
+			base)
+            base;
+            
+select c.productline, count(distinct b.customerNumber) BU
+from classicmodels.orderdetails a
+left join classicmodels.orders b
+on a.ordernumber = b.ordernumber
+left join classicmodels.products c
+on a.productcode = c.productcode
+group by 1;
+
+select d.churn_type, c.productline, count(distinct b.customerNumber) BU
+from classicmodels.orderdetails a
+left join classicmodels.orders b
+on a.ordernumber = b.ordernumber
+left join classicmodels.products c
+on a.productcode = c.productcode
+left join classicmodels.churn_list d
+on b.customernumber = d.customernumber
+group by 1, 2
+order by 1, 3 desc;
