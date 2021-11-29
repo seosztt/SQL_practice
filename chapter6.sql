@@ -182,3 +182,54 @@ left join instacart.products b
 on a.product_id = b.product_id
 group by product_id, b.product_name
 having count(distinct order_id) > 10;
+
+# 다음 구매까지의 소요 기간과 재구매 관계
+select *, row_number() over(order by ret_ratio desc) rnk
+from (select product_id, sum(case when reordered=1 then 1 else 0 end)/count(*) ret_ratio
+	from instacart.order_products__prior
+	group by 1)
+a;
+
+create temporary table instacart.product_repurchase_quantile as
+select a.product_id, case when rnk <= 929 then 'q_1'
+when rnk <= 1858 then 'q_2'
+when rnk <= 2786 then 'q_3'
+when rnk <= 3715 then 'q_4'
+when rnk <= 4644 then 'q_5'
+when rnk <= 5573 then 'q_6'
+when rnk <= 6502 then 'q_7'
+when rnk <= 7430 then 'q_8'
+when rnk <= 8359 then 'q_9'
+when rnk <= 9288 then 'q_10' end rnk_grp
+from (select *, row_number() over(order by ret_ratio desc) rnk
+	from (select product_id, sum(case when reordered=1 then 1 else 0 end)/count(*) ret_ratio
+		from instacart.order_products__prior
+		group by 1)
+	a)
+a
+group by 1, 2;
+
+create temporary table instacart.order_products__prior2 as
+select product_id, days_since_prior_order
+from instacart.order_products__prior a
+inner join instacart.orders b
+on a.order_id = b.order_id;
+
+select a.rnk_grp, a.product_id, variance(days_since_prior_order) var_days
+from instacart.product_repurchase_quantile a
+left join instacart.order_products__prior2 b
+on a.product_id = b.product_id
+group by 1,2
+order by 1;
+
+select rnk_grp, avg(var_days) avg_var_days
+from (select a.rnk_grp, a.product_id, variance(days_since_prior_order) var_days
+	from instacart.product_repurchase_quantile a
+	left join instacart.order_products__prior b
+	on a.product_id = b.product_id
+	left join instacart.orders c
+	on b.order_id = c.order_id
+	group by 1, 2)
+a
+group by 1
+order by 1;
