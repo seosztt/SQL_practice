@@ -166,3 +166,153 @@ group by 1
 order by country;
 
 # 판매 수량이 20% 이상 증가한 상품 리스트 (YTD)
+select distinct substr(invoicedate, 1, 4) YY
+from mydata.dataset3;
+
+## 1) 2011년도 상품별 판매 수량
+select stockcode, sum(quantity) qty
+from mydata.dataset3
+where substr(invoicedate, 1, 4) = '2011'
+group by 1;
+
+## 2) 2010년도 상품병 판매 수량
+select stockcode, sum(quantity) qty
+from mydata.dataset3
+where substr(invoicedate, 1, 4) = '2010'
+group by 1;
+
+## 3) 둘을 결합
+select *
+from (select stockcode, sum(quantity) qty
+		from mydata.dataset3
+		where substr(invoicedate, 1, 4) = '2011'
+		group by 1) a
+left join (select stockcode, sum(quantity) qty
+			from mydata.dataset3
+			where substr(invoicedate, 1, 4) = '2010'
+			group by 1) b
+on a.stockcode = b.stockcode;
+
+select a.stockcode, a.qty, b.qty, a.qty/b.qty-1 qty_increase_rate
+from (select stockcode, sum(quantity) qty
+		from mydata.dataset3
+		where substr(invoicedate, 1, 4) = '2011'
+		group by 1) a
+left join (select stockcode, sum(quantity) qty
+			from mydata.dataset3
+			where substr(invoicedate, 1, 4) = '2010'
+			group by 1) b
+on a.stockcode = b.stockcode;
+
+select *
+from (select a.stockcode, a.qty qty_2011, b.qty qty_2010, a.qty/b.qty-1 qty_increase_rate
+		from (select stockcode, sum(quantity) qty
+				from mydata.dataset3
+				where substr(invoicedate, 1, 4) = '2011'
+				group by 1) a
+		left join (select stockcode, sum(quantity) qty
+					from mydata.dataset3
+					where substr(invoicedate, 1, 4) = '2010'
+					group by 1) b
+		on a.stockcode = b.stockcode) base
+where qty_increase_rate >= 1.2;
+
+# 주차별 매출액
+select weekofyear('2018-01-01');
+
+select weekofyear(invoicedate) wk, sum(quantity*unitprice) sales
+from mydata.dataset3
+where substr(invoicedate, 1, 4) = '2011'
+group by 1
+order by 1;
+
+# 신규 / 기존 고객의 2011년 월별 매출액
+select case when substr(mndt, 1, 4) = '2011' then 'new' else 'exi' end new_exi, customerid
+from (select customerid, min(invoicedate) mndt
+		from mydata.dataset3
+        group by 1) a;
+        
+select a.customerid, b.new_exi, a.invoicedate, a.unitprice, a.quantity
+from mydata.dataset3 a
+left join (select case when substr(mndt, 1, 4) = '2011' then 'new' else 'exi' end new_exi, customerid
+			from (select customerid, min(invoicedate) mndt
+					from mydata.dataset3
+					group by 1) a
+			) b
+on a.CustomerID = b.CustomerID
+where substr(a.invoicedate, 1, 4) = '2011';
+
+select b.new_exi, substr(a.invoicedate, 1, 7) MM, sum(a.unitprice*a.quantity) sales
+from mydata.dataset3 a
+left join (select case when substr(mndt, 1, 4) = '2011' then 'new' else 'exi' end new_exi, customerid
+			from (select CustomerID, min(invoicedate) mndt
+					from mydata.dataset3
+                    group by 1) a) b
+on a.CustomerID = b.CustomerID
+where substr(a.invoicedate, 1, 4) = '2011'
+group by 1, 2;
+			
+# 기존 고객의 2011년 월 누적 리텐션
+select customerid
+from mydata.dataset3
+group by 1
+having min(substr(invoicedate, 1 ,4)) = '2010';
+
+select *
+from mydata.dataset3
+where customerid in (select customerid
+						from mydata.dataset3
+						group by 1
+						having min(substr(invoicedate, 1 ,4)) = '2010')
+					and substr(invoicedate, 1, 4) = '2011';
+                    
+select customerid, substr(invoicedate, 1, 7) MM
+from (select *
+		from mydata.dataset3
+        where customerid in (select customerid
+								from mydata.dataset3
+                                group by 1
+                                having min(substr(invoicedate, 1 ,4)) = '2010')
+							and substr(invoicedate, 1, 4) = '2011') a
+group by 1;
+
+select MM, count(customerid) n_customers
+from (select customerid, substr(invoicedate, 1, 7) MM
+		from (select *
+				from mydata.dataset3
+                where customerid in (select customerid
+										from mydata.dataset3
+                                        group by 1
+										having min(substr(invoicedate, 1 ,4)) = '2010')
+									and substr(invoicedate, 1, 4) = '2011') a
+		group by 1, 2) a
+group by 1
+order by 1;
+
+select count(*) n_customers
+from (select customerid
+		from mydata.dataset3
+        group by 1
+        having min(substr(invoicedate, 1 ,4)) = '2010') a;
+        
+# LTV(Life Time Value)
+select count(b.customerid)/count(a.customerid) retention_rate
+from (select distinct customerid
+		from mydata.dataset3
+        where substr(invoicedate, 1, 4) = '2010') a
+        left join (select distinct customerid
+					from mydata.dataset3
+                    where substr(invoicedate, 1, 4) = '2011') b
+		on a.customerid = b.customerid;
+                    
+select sum(unitprice*quantity)/count(distinct customerid) amv
+from mydata.dataset3
+where substr(InvoiceDate, 1, 4) = '2011';
+
+select count(distinct customerid) n_bu
+from mydata.dataset3
+where substr(invoicedate, 1, 4) = '2011';
+
+select sum(unitprice*quantity) sales_2011
+from mydata.dataset3
+where substr(invoicedate, 1, 4) = '2011';
